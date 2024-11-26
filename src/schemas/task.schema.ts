@@ -3,9 +3,9 @@ import { Document, Schema as MongooseSchema } from 'mongoose';
 import { User } from './user.schema';
 
 export enum TaskStatusEnum {
-  PENDING = 'PENDING',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
+  TO_DO = 'To do',
+  IN_PROGRESS = 'In Progress',
+  COMPLETED = 'Completed',
 }
 
 @Schema({ timestamps: true })
@@ -19,7 +19,7 @@ export class Task extends Document {
   @Prop({
     required: true,
     enum: TaskStatusEnum,
-    default: TaskStatusEnum.PENDING,
+    default: TaskStatusEnum.TO_DO,
   })
   status: TaskStatusEnum;
 

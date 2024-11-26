@@ -20,7 +20,7 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async register(createUserDto: CreateUserDto): Promise<User> {
+  async register(createUserDto: CreateUserDto): Promise<any> {
     try {
       const { name, email, password } = createUserDto;
       const existingUser = await this.userModel.findOne({ email });
@@ -36,7 +36,20 @@ export class AuthService {
         password: hashedPassword,
       });
 
-      return await newUser.save();
+      const user = await newUser.save();
+      const payload: JwtPayload = {
+        id: user._id.toString(),
+        email: user.email,
+      };
+      return {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        token: await this.jwtService.signAsync(payload, {
+          secret: process.env.JWT_SECRET,
+          expiresIn: process.env.JWT_SECRET_EXP,
+        }),
+      };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -78,7 +91,7 @@ export class AuthService {
         id: user._id,
         email: user.email,
         name: user.name,
-        access_token: await this.jwtService.signAsync(payload, {
+        token: await this.jwtService.signAsync(payload, {
           secret: process.env.JWT_SECRET,
           expiresIn: process.env.JWT_SECRET_EXP,
         }),

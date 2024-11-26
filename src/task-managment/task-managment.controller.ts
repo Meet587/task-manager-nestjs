@@ -15,6 +15,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { JwtAuthGuard } from 'src/auth/strategy/jwt-auth.guard';
 import { UpdateTaskStatus } from './dto/update-task-status-req.dto';
+import { ResponceDto } from 'src/interceptors/dtos/resposeDto.dto';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard)
@@ -22,17 +23,17 @@ export class TaskManagmentController {
   constructor(private readonly taskService: TaskManagmentService) {}
 
   @Post()
-  async create(@Body() createTaskDto: CreateTaskDto): Promise<Task> {
+  async create(@Body() createTaskDto: CreateTaskDto): Promise<ResponceDto<Task>> {
     return await this.taskService.createTask(createTaskDto);
   }
 
   @Get('list')
-  async getTasksForUser(): Promise<Task[]> {
+  async getTasksForUser(): Promise<ResponceDto<Task[]>> {
     return await this.taskService.getTasksForUser();
   }
 
   @Get(':id')
-  async getTaskById(@Param('id') id: string): Promise<Task | null> {
+  async getTaskById(@Param('id') id: string): Promise<ResponceDto<Task | null>> {
     return await this.taskService.getTaskById(id);
   }
 
@@ -40,7 +41,7 @@ export class TaskManagmentController {
   async update(
     @Param('id') id: string,
     @Body() updateTaskDto: UpdateTaskDto,
-  ): Promise<Task | null> {
+  ): Promise<ResponceDto<Task | null>> {
     return await this.taskService.updateTask(id, updateTaskDto);
   }
 
@@ -48,7 +49,7 @@ export class TaskManagmentController {
   async updateStatus(
     @Param('id') id: string,
     @Body() updateTaskStatus: UpdateTaskStatus,
-  ): Promise<Task | null> {
+  ): Promise<ResponceDto<Task | null>> {
     return await this.taskService.updateTaskStatsu(id, updateTaskStatus);
   }
 

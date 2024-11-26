@@ -17,6 +17,7 @@ import { Task } from 'src/schemas/task.schema';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatus } from './dto/update-task-status-req.dto';
+import { ResponceDto } from './../interceptors/dtos/resposeDto.dto';
 
 @Injectable({ scope: Scope.REQUEST })
 export class TaskManagmentService {
@@ -25,7 +26,7 @@ export class TaskManagmentService {
     @InjectModel(Task.name) private taskModel: Model<Task>,
   ) {}
 
-  async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
+  async createTask(createTaskDto: CreateTaskDto): Promise<ResponceDto<Task>> {
     try {
       const payload = this.request.user as JwtPayload;
       if (!payload.id) {
@@ -37,20 +38,22 @@ export class TaskManagmentService {
         status: createTaskDto.status,
         user: payload.id,
       });
-      return await newTask.save();
+      await newTask.save();
+      return { message: 'task created.', data: newTask };
     } catch (error) {
       throw new InternalServerErrorException();
     }
   }
 
-  async getTasksForUser(): Promise<Task[]> {
+  async getTasksForUser(): Promise<ResponceDto<Task[]>> {
     try {
       const payload = this.request.user as JwtPayload;
       if (!payload.id) {
         throw new UnauthorizedException();
       }
       const userId = payload.id;
-      return this.taskModel.find({ user: userId }).exec();
+      const list = await this.taskModel.find({ user: userId });
+      return { message: 'task list fetched.', data: list };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -60,12 +63,13 @@ export class TaskManagmentService {
     }
   }
 
-  async getTaskById(taskId: string): Promise<Task | null> {
+  async getTaskById(taskId: string): Promise<ResponceDto<Task | null>> {
     try {
       if (!isValidObjectId(taskId)) {
         throw new BadRequestException('invalid task id.');
       }
-      return this.taskModel.findById(taskId).exec();
+      const task = await this.taskModel.findById(taskId);
+      return { message: 'task fetched.', data: task };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -78,7 +82,7 @@ export class TaskManagmentService {
   async updateTaskStatsu(
     taskId: string,
     updateTaskStatus: UpdateTaskStatus,
-  ): Promise<Task | null> {
+  ): Promise<ResponceDto<Task | null>> {
     try {
       if (!isValidObjectId(taskId)) {
         throw new BadRequestException('invalid task id.');
@@ -87,15 +91,14 @@ export class TaskManagmentService {
       if (!oldTask) {
         throw new NotFoundException('task not found.');
       }
-      return await this.taskModel
-        .findByIdAndUpdate(
-          taskId,
-          {
-            status: updateTaskStatus.status,
-          },
-          { new: true },
-        )
-        .exec();
+      const updatedTask = await this.taskModel.findByIdAndUpdate(
+        taskId,
+        {
+          status: updateTaskStatus.status,
+        },
+        { new: true },
+      );
+      return { message: 'task updated.', data: updatedTask };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -108,7 +111,7 @@ export class TaskManagmentService {
   async updateTask(
     taskId: string,
     updateTaskDto: UpdateTaskDto,
-  ): Promise<Task | null> {
+  ): Promise<ResponceDto<Task | null>> {
     try {
       if (!isValidObjectId(taskId)) {
         throw new BadRequestException('invalid task id.');
@@ -117,17 +120,16 @@ export class TaskManagmentService {
       if (!oldTask) {
         throw new NotFoundException('task not found.');
       }
-      return await this.taskModel
-        .findByIdAndUpdate(
-          taskId,
-          {
-            title: updateTaskDto.title,
-            description: updateTaskDto.description,
-            status: updateTaskDto.status,
-          },
-          { new: true },
-        )
-        .exec();
+      const updated = await this.taskModel.findByIdAndUpdate(
+        taskId,
+        {
+          title: updateTaskDto.title,
+          description: updateTaskDto.description,
+          status: updateTaskDto.status,
+        },
+        { new: true },
+      );
+      return { message: 'task updated.', data: updated };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
