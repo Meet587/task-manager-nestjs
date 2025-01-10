@@ -1,14 +1,16 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { Task, TaskSchema } from 'src/schemas/task.schema';
 import { TaskManagmentController } from './task-managment.controller';
 import { TaskManagmentService } from './task-managment.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { TasksEntity } from 'src/db/entities/task.entity';
+import { TaskRepository } from 'src/db/repositories/task.repository';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: Task.name, schema: TaskSchema }]),
-  ],
+  imports: [TypeOrmModule.forFeature([TasksEntity])],
   controllers: [TaskManagmentController],
-  providers: [TaskManagmentService],
+  providers: [
+    TaskManagmentService,
+    { provide: 'taskRepositoryInterface', useClass: TaskRepository },
+  ],
 })
 export class TaskManagmentModule {}

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   HttpException,
   Inject,
   Injectable,
@@ -9,52 +8,60 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
-import { InjectModel } from '@nestjs/mongoose';
 import { Request } from 'express';
-import { isValidObjectId, Model } from 'mongoose';
 import { JwtPayload } from 'src/auth/strategy/jwt-payload.interface';
-import { Task } from 'src/schemas/task.schema';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatus } from './dto/update-task-status-req.dto';
-import { ResponceDto } from './../interceptors/dtos/resposeDto.dto';
+import { ConfigService } from '@nestjs/config';
+import { TaskRepositoryInterface } from './../db/interfaces/task.interface';
+import { TasksEntity } from 'src/db/entities/task.entity';
 
 @Injectable({ scope: Scope.REQUEST })
 export class TaskManagmentService {
   constructor(
     @Inject(REQUEST) private request: Request,
-    @InjectModel(Task.name) private taskModel: Model<Task>,
+    private readonly configService: ConfigService,
+    @Inject('taskRepositoryInterface')
+    private readonly taskRepository: TaskRepositoryInterface,
   ) {}
 
-  async createTask(createTaskDto: CreateTaskDto): Promise<ResponceDto<Task>> {
+  async createTask(createTaskDto: CreateTaskDto): Promise<any> {
     try {
       const payload = this.request.user as JwtPayload;
-      if (!payload.id) {
+      if (!payload) {
         throw new UnauthorizedException();
       }
-      const newTask = new this.taskModel({
+
+      const newTask = await this.taskRepository.save({
         title: createTaskDto.title,
         description: createTaskDto.description,
         status: createTaskDto.status,
-        user: payload.id,
+        userId: <any>payload.id,
       });
-      await newTask.save();
+
       return { message: 'task created.', data: newTask };
     } catch (error) {
+      console.log(error);
       throw new InternalServerErrorException();
     }
   }
 
-  async getTasksForUser(): Promise<ResponceDto<Task[]>> {
+  async getTasksForUser(): Promise<any> {
     try {
       const payload = this.request.user as JwtPayload;
-      if (!payload.id) {
+      if (!payload?.id) {
         throw new UnauthorizedException();
       }
-      const userId = payload.id;
-      const list = await this.taskModel.find({ user: userId });
+      const userId = Number(payload.id);
+      const list = await this.taskRepository.findAll({
+        where: {
+          userId: <any>userId,
+        },
+      });
       return { message: 'task list fetched.', data: list };
     } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       } else {
@@ -63,14 +70,25 @@ export class TaskManagmentService {
     }
   }
 
-  async getTaskById(taskId: string): Promise<ResponceDto<Task | null>> {
+  async getTaskById(taskId: string): Promise<any> {
     try {
-      if (!isValidObjectId(taskId)) {
-        throw new BadRequestException('invalid task id.');
+      const payload = this.request.user as JwtPayload;
+      if (!payload?.id) {
+        throw new UnauthorizedException();
       }
-      const task = await this.taskModel.findById(taskId);
+      const userId = Number(payload.id);
+      const task = await this.taskRepository.findByCondition({
+        where: {
+          id: +taskId,
+          userId: <any>userId,
+        },
+      });
+      if (!task) {
+        throw new NotFoundException('task not found.');
+      }
       return { message: 'task fetched.', data: task };
     } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       } else {
@@ -82,24 +100,16 @@ export class TaskManagmentService {
   async updateTaskStatsu(
     taskId: string,
     updateTaskStatus: UpdateTaskStatus,
-  ): Promise<ResponceDto<Task | null>> {
+  ): Promise<any> {
     try {
-      if (!isValidObjectId(taskId)) {
-        throw new BadRequestException('invalid task id.');
-      }
-      const oldTask = await this.taskModel.findById(taskId);
-      if (!oldTask) {
-        throw new NotFoundException('task not found.');
-      }
-      const updatedTask = await this.taskModel.findByIdAndUpdate(
-        taskId,
-        {
-          status: updateTaskStatus.status,
-        },
-        { new: true },
-      );
-      return { message: 'task updated.', data: updatedTask };
+      const task = await this.findById(taskId);
+
+      task.status = updateTaskStatus.status;
+
+      await this.taskRepository.save(task);
+      return true;
     } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       } else {
@@ -108,29 +118,17 @@ export class TaskManagmentService {
     }
   }
 
-  async updateTask(
-    taskId: string,
-    updateTaskDto: UpdateTaskDto,
-  ): Promise<ResponceDto<Task | null>> {
+  async updateTask(taskId: string, updateTaskDto: UpdateTaskDto): Promise<any> {
     try {
-      if (!isValidObjectId(taskId)) {
-        throw new BadRequestException('invalid task id.');
-      }
-      const oldTask = await this.taskModel.findById(taskId);
-      if (!oldTask) {
-        throw new NotFoundException('task not found.');
-      }
-      const updated = await this.taskModel.findByIdAndUpdate(
-        taskId,
-        {
-          title: updateTaskDto.title,
-          description: updateTaskDto.description,
-          status: updateTaskDto.status,
-        },
-        { new: true },
-      );
-      return { message: 'task updated.', data: updated };
+      const task = await this.findById(taskId);
+      task.title = updateTaskDto.title;
+      task.description = updateTaskDto.description;
+      task.status = updateTaskDto.status;
+      await this.taskRepository.save(task);
+
+      return true;
     } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       } else {
@@ -141,21 +139,30 @@ export class TaskManagmentService {
 
   async deleteTask(taskId: string): Promise<boolean> {
     try {
-      if (!isValidObjectId(taskId)) {
-        throw new BadRequestException('invalid task id.');
-      }
-      const oldTask = await this.taskModel.findById(taskId);
-      if (!oldTask) {
-        throw new NotFoundException('task not found.');
-      }
-      await this.taskModel.findByIdAndDelete(taskId).exec();
+      const task = await this.findById(taskId);
+      await this.taskRepository.remove(task);
+
       return true;
     } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       } else {
         throw new InternalServerErrorException();
       }
+    }
+  }
+
+  async findById(taskId: string): Promise<TasksEntity> {
+    try {
+      const task = await this.taskRepository.findOneById(taskId);
+
+      if (!task) {
+        throw new NotFoundException('Task not found.');
+      }
+      return task;
+    } catch (error) {
+      throw error;
     }
   }
 }
